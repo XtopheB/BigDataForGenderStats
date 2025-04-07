@@ -4,22 +4,24 @@ subtitle: "*Regional Training on Big Data and Data Science for Gender Statistics
 author: "Your Name (Your Institution)"
 date: "`r Sys.Date()`"
 output:
+  word_document:
+    toc: no
   html_document:
     toc: yes
     toc_float: true
     code_folding: hide
   pdf_document:
     toc: yes
-  word_document:
-    toc: no
 ---
 
 
 ```{r libraries, include = FALSE}
-# Load the required libraries, 
+# Load the required libraries
+
 # if these libraries are not already installed on your computer:
 #  - Use the package installation from the bottom right panel in RStudio (recommended)
 # - Or (experimented users) uncomment the next line (only once)
+
 # install.packages(c("tidyverse", "flextable"))
 
 # For manipulating data
@@ -41,7 +43,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 In this advanced report, we will  whange only one parameter  *MyYear$ to have all code and text written as function of a parameter, so that changing that parameter at the very beginning of the code would consistently change the whole report. 
 
 ```{r}
-MyYear <- 2010
+MyYear <- 2015
 ```
 
 > Let's redo the analysis for the year **`r MyYear`**
@@ -132,7 +134,8 @@ StatsByCountryYear  %>%
 ```
 
 # Conclusion for year `r MyYear`
- In this report, we explored the indicator **5.5.1** *Proportion of seats held by women in national parliaments* for **`r nrow(GenderData)`** countries, as a table and as a graphic for the selected year (**`r MyYear`**) by just changing **one parameter** `MyYear` at the beginning of the document. 
+
+ In this report, we explored the indicator **5.5.1** *Proportion of seats held by women in national parliaments* for **`r nrow(GenderData)`** countries, as a table and as a graphic for the selected year (**`r MyYear`**) by just changing **one global parameter** `MyYear` at the beginning of the document. 
 
 
 

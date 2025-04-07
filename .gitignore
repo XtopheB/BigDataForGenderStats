@@ -9,6 +9,20 @@
 # User-specific files
 .Ruserdata
 
+# Map Data
+*.txt
+*.cpg
+*.prj
+*.shp
+*.shx
+*.dbf
+
+# Outputs
+*.html
+*.pdf
+*.docx
+
+
 # Example code in package build process
 *-Ex.R
 
@@ -20,6 +34,7 @@
 
 # RStudio files
 .Rproj.user/
+*.Rproj
 
 # produced vignettes
 vignettes/*.html

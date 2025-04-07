@@ -1,0 +1,138 @@
+---
+title: 'Adapting an (automated) Report on Gender Statistics'
+subtitle: "*Regional Training on Big Data and Data Science for Gender Statistics in Asia and the Pacific*"
+author: "Your Name (Your Institution)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: true
+    code_folding: hide
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: no
+---
+
+
+```{r libraries, include = FALSE}
+# Load the required libraries, 
+# if these libraries are not already installed on your computer:
+#  - Use the package installation from the bottom right panel in RStudio (recommended)
+# - Or (experimented users) uncomment the next line (only once)
+# install.packages(c("tidyverse", "flextable"))
+
+# For manipulating data
+library(tidyverse)
+
+# For tables display
+library(flextable)
+
+```
+
+
+```{r setup, include=FALSE}
+# Set echo=FALSE as default for code cells
+# The code folding for HTLM output is thus deactivated
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+
+```
+
+In this advanced report, we will  whange only one parameter  *MyYear$ to have all code and text written as function of a parameter, so that changing that parameter at the very beginning of the code would consistently change the whole report. 
+
+```{r}
+MyYear <- 2010
+```
+
+> Let's redo the analysis for the year **`r MyYear`**
+
+**As in the previous document**, we provide here some basic elements about the data set and descriptive statistics on some variables of interest.  
+
+* First we load the data (directly from GitHub)
+* Second we start exploring some variables
+
+```{r echo =FALSE}
+GenderData <- read.csv("https://raw.githubusercontent.com/XtopheB/BigDataForGenderStats/refs/heads/main/Data/SG_GEN_PARL_ap.csv")
+
+# If you want, you can store also the data locally and load it  from there
+# GenderData <- read.csv("Data/SG_GEN_PARL_ap.csv")
+
+```
+
+
+We will work with data on the SDG 5.5.1 indicator ("*Proportion of seats held by women in national parliaments*") available as a CSV file from  [UNSSTAT database](https://unstats.un.org/SDGS/Indicators/Database/). For easing the exercise, we stored this data set on GitHub server and use a direct download of the data set from there (*SG_GEN_PARL_ap.csv*). This report was compiled on **`r format(Sys.Date(), "%A %d %B")`**.
+
+
+# Data exploration
+
+The data set contains   **`r  nrow(GenderData)`  observations**, and  **`r  ncol(GenderData)`** variables.
+Let's see also the list of countries. This information is in the variable *GeoAreaName*. 
+
+```{r}
+ListCountries <- unique(GenderData$GeoAreaName)
+ListCountries
+
+```
+We have `r length(ListCountries)` countries in our data set, over 11 years (2021-2020)
+
+
+## Adapting the report for the year
+
+The previous analysis was done for a specific year (2020). Imagine now the same report but for any year in [2010, 2020]. Let's now do the analysis for the year that was selected! 
+
+> We have now selected the year **`r MyYear`**, let's see the ***new*** report!
+
+We use the same table as before. Maybe that could be a function later ;-).
+
+```{r warning=FALSE}
+# We first need to identify the variable for the selected year that we will summarize:
+SelectedColumn <- paste0("X", MyYear)
+
+# Now only for a specific year
+StatsByCountryYear <- GenderData %>%
+  group_by(GeoAreaName) %>%
+  summarise(Percentage = .data[[SelectedColumn]]) %>% # <- This seems advanced, but works well
+  arrange(desc(Percentage))
+
+```
+
+## As a table
+We can represent the indicator as a sorted table, with highest values being on top for the year  **`r MyYear`**:
+
+```{r}
+# We will tweak a little bit the table to have a caption
+MyTable <- flextable(StatsByCountryYear)
+# Inserting a caption with the year
+MyTable <- set_caption(MyTable, paste("Year", MyYear))
+MyTable
+```
+It seems that some values are missing (bottom of the table) and have been replaced by zeros. This issue should be addressed in the analysis, but we will not do it in this report.
+
+## As  a graphic 
+As expected, the graphic is now for the year `r MyYear`:
+
+```{r warning=FALSE}
+StatsByCountryYear  %>%
+  filter(!is.na(Percentage)) %>%  # to remove NAs
+  ggplot()+
+  aes(x = reorder(GeoAreaName, Percentage), y = (Percentage)) +
+  geom_bar(stat = "identity", 
+             fill= "lightsteelblue1") +
+  # we can add data to the graphic as well
+  geom_text(aes(label= paste(Percentage, "%")), 
+            color = "navyblue", vjust= 0.3, size=2.5,)+
+  labs(title ="Proportion of seats held by women in national parliaments ", 
+       subtitle = paste("Year",MyYear), 
+       caption  = paste("Source: UNSSTAT (file date: ",Sys.Date(), ")"), 
+       x= "Countries",
+       y = "Percentages") +
+  coord_flip() +
+  theme_minimal()
+
+```
+
+# Conclusion for year `r MyYear`
+ In this report, we explored the indicator **5.5.1** *Proportion of seats held by women in national parliaments* for **`r nrow(GenderData)`** countries, as a table and as a graphic for the selected year (**`r MyYear`**) by just changing **one parameter** `MyYear` at the beginning of the document. 
+
+
+

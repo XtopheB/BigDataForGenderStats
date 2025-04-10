@@ -50,10 +50,10 @@ library(haven)    # For reading DHS datasets
 library(dplyr)
 library(data.table)
 
-
 # Plotting packages
 library(ggplot2)
 library(RColorBrewer)
+library(ggcorrplot)
 
 # Nice presentation of results
 library(knitr)
@@ -63,7 +63,7 @@ library(modelsummary)
 ```
 
 
-### The DHS survey data
+## The DHS survey data
 
 We load and prepare the Demographic and Health Survey (DHS) data and define child marriage, in line with SDG indicator 5.3.1.
 
@@ -74,8 +74,8 @@ We load and prepare the Demographic and Health Survey (DHS) data and define chil
 DHS_raw <- read_sav("Data/BDIR72SV/BDIR72FL.SAV")
 ```
 
-Since the DHS data contains  **`r ncol(DHS_raw)`** variables (columns), we begin by selecting a few key variables.  
-We also scale the survey weights and recode some explanatory variables (e.g., education level) to facilitate further analysis. Here is a summary of the data, including a count of missing. 
+We have **`r nrow(DHS_raw)`** observations (households) in the DHS file we are analysisng for Bangladesh. Since the DHS data contains  **`r ncol(DHS_raw)`** variables (columns), we begin by selecting a few key variables.  
+We also scale the survey weights and recode some explanatory variables (e.g., education level) to facilitate further analysis. Here is a summary of the data, including a count of missing (if any). 
 
 ```{r}
 # Select relevant variables
@@ -119,12 +119,11 @@ We first define the population under scrutiny (women aged 20-24), and compute ch
 -  Numerator  = *Nb of women aged 20-24 who where married or in a union before the age of 15 of before age 18*
 -  Denominator = *Nb of women aged 20-24 in the population*
 
-The rate is then simply
+The rate is then simply:
 $$
  Rate  = \frac{numerator}{denominator} \times 100
 $$
-But to compute that rate, one must integrate the weight `wt` of each individual in the computation. 
-
+But to compute that rate, one must integrate the weight `wt` of each individual in the computation.  
 ```{r}
 # Filter women aged 20-24
 DHS_data_filtered <- subset(DHS_data, V012 >= 20 & V012 < 25)
@@ -135,14 +134,18 @@ cluster_rate <- aggregate(
   data = DHS_data_filtered, 
   FUN = sum, na.rm = TRUE
 )
+# Add child marriage rate to the summary table
+cluster_rate<- cluster_rate %>%
+  mutate(child_marriage_rate = numerator / denominator)
+
+# Median value
+median_rate <- round(median(cluster_rate$child_marriage_rate), 4) *100
 ```
+When computing the child marriage rate for each of the*`r nrow(cluster_rate)`*  cluster, we can see some disparities. Overall the median value is  value is **`r median_rate``** \%.
 
 
 ```{r echo=FALSE, results=TRUE}
-# Add child marriage rate to the summary table
 
-cluster_rate<- cluster_rate %>%
-  mutate(child_marriage_rate = numerator / denominator)
 
 # Rename the first column to "DHSCLUST"
 colnames(cluster_rate)[1] <- "DHSCLUST"
@@ -155,9 +158,9 @@ datasummary_skim(select(cluster_rate, -c("DHSCLUST")),
 
 ```
 
-## Integrating spatial component at the cluster level
+### Integrating spatial component at the cluster level
 
-We integrate geospatial data with survey-based child marriage estimates to explore the potential influence of environmental factors. We begin by loading geocovariate data (e.g., aridity) and DHS cluster shapefiles, then merge these with child marriage rates at the cluster level. 
+We integrate geospatial data with survey-based child marriage estimates to explore the potential influence of environmental factors. We begin by loading geovariate data (*e.g.*, aridity, population, etc.) and DHS cluster shapefiles, then merge these with child marriage rates at the cluster level. 
 
 ```{r}
 # Load geospatial covariate data
@@ -176,8 +179,7 @@ merged_df <- merge(merged_df, cluster_rate, by = "DHSCLUST")
 geo_cam <- subset(merged_df, LONGNUM != 0)
 ```
 
-Once again we have a large data set with **`r ncol(geo_cam)`** variables at the cluster level. We will here only use *Aridity*. Later in the analysis, we will select more variables to capture the multi-dimensional aspect of child marriage.
-Here is a quick descrption of the variables at hand. 
+Once again we have a large data set with **`r ncol(geo_cam)`** variables at the cluster level. Here is a quick description of the variables at hand. Most variables are avaialble for several years. We will focus here only on the most recent ones for the year 2015.
 
 ```{r echo=FALSE, results=TRUE}
 # Let's explore specific variables. 
@@ -192,15 +194,19 @@ datasummary_skim(select(geo_cam, Mygeovariables),
 
 ```
 
+> Some cleaning, and choices on the variables to pick is needed
 
 We need to do  basic data cleaning and ensure that all spatial layers use a common coordinate reference system (CRS) to allow accurate spatial analysis and mapping.
 Also, we can observe some minimal values at **-9999** that are not correct. 
 
 ```{r}
-
 geo_cam$Aridity_2015[geo_cam$Aridity_2015 < 0] <- NA
-summary(geo_cam$Aridity_2015)
 ```
+
+# Child marriage and aridity
+
+We will here only use *Aridity*. Later in the analysis, we will select more variables to capture the multi-dimensional aspect of child marriage.
+
 ```{r}
 # Load Bangladesh administrative boundary shapefile
 boundary <- read_sf("Data/gadm41_BGD_shp/gadm41_BGD_2.shp")
@@ -211,13 +217,22 @@ st_crs(boundary) <- 4326  # Set CRS to WGS 84 if not already
 st_crs(geo_cam) <- 4326   # Ensure geo_cam has the same CRS
 ```
 
+## Visualizing clusters with highest child marriage rate
+
+```{r}
+Mythreshold <- 0.75
+```
+
+We can extract the clusters with a  child marriage rate above `r Mythreshold*100` \% . 
 
 ```{r}
 ## ----Calculate Top 10% Child Marriage Clusters-----------------------------------------------------------------------
-# Calculate the 90th percentile of child marriage rates
-threshold_marriage <- quantile(geo_cam$child_marriage_rate, 0.75, na.rm = TRUE)
+# Calculate the percentile of child marriage rates (based on Mythreshold)
+threshold_marriage <- quantile(geo_cam$child_marriage_rate, Mythreshold, na.rm = TRUE)
+
+# Also, the top 25 cluster..
 top_25_clusters <- subset(geo_cam, child_marriage_rate > threshold_marriage)
-summary(geo_cam$child_marriage_rate)
+
 ```
 
 
@@ -241,6 +256,8 @@ overlay_map <- ggplot() +
              size = 1.5, shape = 21, fill = "black", color = "black", stroke = 1.5) +
   
   # Customize the theme for a clean appearance
+  ggtitle(label = "Aridity Map of Bangladesh with high mariage rate clusters ", 
+          subtitle = paste("Clusters with a child marriage rate above", Mythreshold, "are represented (black dots)")) +
   theme_void() +
   coord_sf()
 
@@ -250,20 +267,14 @@ plot(overlay_map)
 ```
 
 
+# Multi-dimensional approach 
 
-
-
-
-
-# Logistic regression
 
 ## Data preparation 
 
+For a detailed analysis at the individual level (DHS is micro data) we have to merge DHS data and envrionment data at the cluster level using the location of each household. 
 
 ```{r}
-# Load geospatial covariate data
-geo_covariate <- read.csv("Data/BDGC72FL.csv")
-
 # Merge DHS with environmental variables
 DHS_Full <- merge(DHS_data , geo_covariate, by.x ="V001", by.y=c("DHSCLUST"), all.x=T) 
 
@@ -276,26 +287,75 @@ DHS_Full <- merge(DHS_data , geo_covariate, by.x ="V001", by.y=c("DHSCLUST"), al
   mutate(Aridity = ifelse(Aridity_2015 < 0, NA, Aridity_2015)  )
 ```
 
+As we have seen, we can integrate environmental variables since our auxiliary environmental data set contains  **`r ncol(geo_covariate)`**  variables. We will select here a few variables that seem to be relevant and not too correlated. 
 
 ```{r}
 # Defining the variables of the model
 Y<-"married_before_18"               # Response variable
-# XCovars <- c(15, 17, 57:64)   # age+education+GIS
-XCovars <- c("Age", "Education", "Electricity" ,  "Aridity", "Drought_Episodes",  "UN_Population_Density_2015",  "SMOD_Population_2015") 
+XCovars <- c("Age", "Education", "Electricity" ,  "Aridity") 
+ZCovars <- c("Drought_Episodes",  "UN_Population_Density_2015",  "SMOD_Population_2015") 
 
-#DHS_Full$Drought_Episodes
 
 ```
 
-> We can define the formula as a string variable for reusing..
 
-```{r}
-formula_string<- paste(Y, paste(XCovars, collapse=" + "), sep="~")
+```{r }
+# Drop geometry column (important if geo_cam is an sf object)
+geo_cam_df <- st_drop_geometry(geo_cam)
+
+# Keep only relevant and complete variables 
+existing_vars <- Mygeovariables[Mygeovariables %in% names(geo_cam_df)]
+ 
+
+corr_data <- geo_cam_df %>%
+  select(all_of(existing_vars))%>%
+  select(!starts_with("Mal") & !starts_with("All")) %>%
+  select(1:8, starts_with("UN"), starts_with("SMOD")) %>%
+  mutate(across(everything(), as.numeric))
+
+# We compute the correlation matrix of the covariates
+corr_coef <- cor(corr_data, use = "p")
+
+#And then plot it with nice options 
+ggcorrplot(corr_coef, 
+           title = "Correlation of some environmental variables available",
+           type = "lower",         # lower triangle of the matrix only
+           hc.order = TRUE,        # variable sorted from highest to lowest
+           outline.col = "white",  #Color options
+           lab = TRUE)
+
+```
+
+In this analysis, we will use: 
+
+- `r XCovars`  as classical socio-demographic variables and 
+- `r ZCovars`  as  environmental variables to include in the model.  
+
+
+> Finaly, the formula of our model is: 
+
+```{r , results=TRUE}
+formula_string<- paste(Y, paste(c(XCovars, ZCovars), collapse=" + "), sep="~")
 print(paste(" Regression formula: ",formula_string))
 
 ```
 
-## Results
+## Logistic model. 
+
+To estimate the likelihood of child marriage, we use a logistic regression model. Since the dependent variable is binary (married before age 18 or not), we use the log of odd ratios (*log-odds*) of the event using a generalized linear model.
+
+The logistic regression model takes the form:
+$$
+\log\left( \frac{p}{1 - p} \right) = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \cdots + \beta_k X_k
+$$
+Where:
+
+- p is the is the probability of being married before age 18
+- $\beta_0$ is the intercept 
+- $\beta_i$ are the coefficients for the explanatory variables $X_i$
+
+This allows us to quantify the impact of demographic, socioeconomic, and environmental variables on the likelihood of child marriage.
+
 
 ```{r, results='asis'}
 # Logistics Regression with the DHS structure
@@ -312,9 +372,11 @@ kable(pretty_lm2, digits = 3)
 ```
 
 
+### Common mistake
 
-> But, wait,  we need to take into account the specific structure of the DHS survey. 
+> But, wait! We need to take into account the specific structure of the DHS survey. 
 
+Since we have a survey, and thus each observation is weighted according to specific scheme, we must use that feature in our model. The correct results are thus the following. In principle, there should not be too much difference withe the unweighted model. 
 
 ```{r}
 # Convert to correct types
@@ -344,14 +406,33 @@ kable(pretty_lm2, digits = 3)
 ```
 
 
-## Confusion Matrix and other criterias
+### Confusion Matrix and other criterias
+
+To asses the quality of our estimation, one can check whether the model predicts well the observations by examining the confusion matrix that counts observations predicted *vs* observed. 
+
 
 ```{r, results=TRUE }
 library("regclass")
-cm <- confusion_matrix(glm.simple.fit)
-cm
+cm <- confusion_matrix(glm.fit.strat)
+t(cm)
 ```
 
+We can also check different numerical indicators based on the confusion matrix. 
+Recalling that: 
+
+```{r, out.width = "400px", results= TRUE}
+knitr::include_graphics("ConfusionMatrix.png")
+```
+
+We can check several important indicators:
+
+- ***Accuracy***: (TP + TN) / (TP + TN + FP + FN) $\leftarrow$ This is global rate of performance
+- ***Specificity*** : TP / (TP + FP) $\leftarrow$ proportion of positive predictions that are correct.
+- ***Sensitivity*** (or *recall*): TP / (TP + FN) $\leftarrow$ proportion of actual positives that are correctly predicted.
+- ***F1 score***: combines Specificity and sensitivity:
+$$
+F1\_score = \frac{2 \times Specificity \times Sensitivity}{ Specificity + Sensitivity}
+$$ 
 
 
 ```{r}
@@ -375,20 +456,19 @@ sensitivity <- TP / (TP + FN)
 f1_score <- 2 * (specificity * sensitivity) / (specificity + sensitivity)
 ```
 
-#### Some definitions 
-Accuracy: (TP + TN) / (TP + TN + FP + FN)
-Specificity : TP / (TP + FP) — proportion of positive predictions that are correct.
-Sensitivity (recall)): TP / (TP + FN) — proportion of actual positives that are correctly predicted.
+Here, we have for our logit model : 
 
+- **Accuracy** = *`r  round(accuracy, 3)`*
+- **Specificity** =  *`r round(specificity,3)`*
+- **Sensitivity** = *`r  round(sensitivity,3)`*
+- **F1_score** = *`r round(f1_score,3)`*
 
-Here, we have for the logit model : 
-
-- `r paste("accuracy =", round(accuracy, 3))`
-- `r paste("specificity = ", round(specificity,3))`
-- `r paste("sensitivity =", round(sensitivity,3))`
-- `r paste("f1_score =",  round(f1_score,3))`
+> The accuracy of our model is  `r  round(accuracy*100, 1)` \%
 
 ## Visual representation of the logistic model
+
+To better understand the relationship between child marriage and key covariates, we can use a plot of the predicted probability of being married before age 18 as a function of four variables: age, education level, aridity, and population density. 
+These **marginal effects** are directly derived from the logistic regression model.  We can then interpret the (marginal) effect on the probability of child marriage due to variation of each variable, with all other variables held constant. 
 
 
 ```{r }
@@ -427,6 +507,18 @@ figure <- ggarrange( p.age, p.education, p.aridity, p.income,
                     ncol = 2, nrow = 2)
 figure
 ```
+
+
+# Conclusion
+
+In this analysis we tested the hypothese that  environmental factors such as drought episode, levels of aridity, or degrees of urbanization could play a role in child marriage. 
+
+By combining data from survey and geospatial sources, we showcase the importance of multi-dimensional drivers of child marriage and provide tools to examine them through a data-driven approach. We provide a  cluster-level exploration of child marriage, revealing a visible spatial correlation between high child marriage rates and aridity and a map of Bangladesh. 
+
+This initial geospatial insight provided the motivation for a multivariate approach taking into account not only socio-economic factoirs, but also environmental factors. We use a modelling based on a logistic regression and results confirmed that, alongside well-established socio-economic drivers like education, environmental factors such as aridity levels are also associated with the likelihood of child marriage. 
+
+These findings suggest that effective policy responses should integrate both social and environmental dimensions to address child marriage.
+
 
 ```{r}
 knitr::knit_exit()

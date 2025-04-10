@@ -1,0 +1,695 @@
+---
+title: "Analysing the realtions between child marriage and the environment"
+subtitle: "A step-by-step case study with Bangladesh data (DHS) "
+author: "Christophe Bontemps (SIAP)  & Eunkoo Lee (UN Women)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_float: true
+    code_folding: hide
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: no
+---
+
+```{r setup, include=FALSE}
+# Default for chunk options 
+knitr::opts_chunk$set( message = FALSE, warning = FALSE, 
+                       results =FALSE, echo = TRUE)
+
+```
+
+
+# Integrating household survey and geospatial data
+
+We focus here on SDG 5.3.1, which measures the *proportion of women aged 20–24 years who were married or in a union before age 15 and before age 18*. We aim to explore both the methodological steps needed to compute this indicator and how to enhance its analysis by integrating additional sources of information, in particular environmental factors. 
+
+A key objective is to show the practical aspects of calculating the SDG 5.3.1 indicator using survey data. But while social and economic factors are widely recognized in shaping early marriage patterns, we propose a new lens for analysis: the environment. 
+
+> Could environmental factors such as drought episode, levels of aridity, or degrees of urbanization play a role in child marriage?
+
+By combining data from survey and geospatial sources, we showcase the importance of multi-dimensional drivers of child marriage and provide tools to examine them through a data-driven approach.
+
+## Data and tools 
+
+We need a minimum of packages to handle different types of data - Survey data (DHS),environmental data (geospatial data) - and for the analysis (modeling) and visualization (maps)
+
+```{r packages}
+# GIS packages
+library(raster) ## for reading "RASTER" files
+library(sf)     ## For reading shapefiles
+library(sp)     ## for adjusting CRS in 
+
+# Load the packages for reading data
+library(survey)
+library(haven)    # For reading DHS datasets
+
+# Tidy data management packages
+library(dplyr)
+library(data.table)
+
+
+# Plotting packages
+library(ggplot2)
+library(RColorBrewer)
+
+# Nice presentation of results
+library(knitr)
+library(papeR)
+library(data.table)
+library(modelsummary)
+```
+
+
+### The DHS survey data
+
+We load and prepare the Demographic and Health Survey (DHS) data and define child marriage, in line with SDG indicator 5.3.1.
+
+
+```{r}
+## ----Read DHS Data ---
+# Load DHS women individual record dataset
+DHS_raw <- read_sav("Data/BDIR72SV/BDIR72FL.SAV")
+```
+
+Since the DHS data contains  **`r ncol(DHS_raw)`** variables (columns), we begin by selecting a few key variables.  
+We also scale the survey weights and recode some explanatory variables (e.g., education level) to facilitate further analysis. Here is a summary of the data, including a count of missing. 
+
+```{r}
+# Select relevant variables
+ivar_name <- c("CASEID", "V001", "V002", "V003", "V005", "V012", "V015", "V021", "V022", "V106", "V119",  "V511")
+
+DHS_data <- DHS_raw %>%
+  dplyr::select(ivar_name)
+
+# Create new variables ( Child marriage, Scale weights, ..)
+DHS_data <- DHS_data %>%
+mutate(       married_before_18 = as.factor(ifelse(V511 < 18, 1, 0)), # Create binary indicator for child marriage
+              wt = V005 / 1000000)                     # Scale weights
+       
+
+# Renaming explanatory variables
+DHS_data <- DHS_data %>%                   
+  mutate(Age = V012, 
+         Education = factor(V106,
+                            levels = c(0, 1, 2, 3),
+                            labels = c("No education", "Primary", "Secondary", "Higher")),
+         
+          Electricity = factor(V119, 
+                               levels = c(0, 1),
+                              labels = c("No", "Yes"))
+  )
+```
+
+
+```{r echo=FALSE, results=TRUE}
+DHS_data %>% datasummary_skim()
+
+```
+
+
+
+# Computing child marriage rate at cluster level
+
+
+We first define the population under scrutiny (women aged 20-24), and compute child marriage rate by cluster. The indicator is based on a numerator and denominator
+
+-  Numerator  = *Nb of women aged 20-24 who where married or in a union before the age of 15 of before age 18*
+-  Denominator = *Nb of women aged 20-24 in the population*
+
+The rate is then simply
+$$
+ Rate  = \frac{numerator}{denominator} \times 100
+$$
+But to compute that rate, one must integrate the weight `wt` of each individual in the computation. 
+
+```{r}
+# Filter women aged 20-24
+DHS_data_filtered <- subset(DHS_data, V012 >= 20 & V012 < 25)
+
+# Calculate child marriage rate by cluster
+cluster_rate <- aggregate(
+  cbind(numerator = ifelse(married_before_18 ==1, wt, 0), denominator = wt) ~ V001, 
+  data = DHS_data_filtered, 
+  FUN = sum, na.rm = TRUE
+)
+```
+
+
+```{r echo=FALSE, results=TRUE}
+# Add child marriage rate to the summary table
+
+cluster_rate<- cluster_rate %>%
+  mutate(child_marriage_rate = numerator / denominator)
+
+# Rename the first column to "DHSCLUST"
+colnames(cluster_rate)[1] <- "DHSCLUST"
+
+
+datasummary_skim(select(cluster_rate, -c("DHSCLUST")), 
+                 title = "Child marriage rate by cluster",
+                 digit =2, 
+                notes = paste("N =", nrow(cluster_summary)) )
+
+```
+
+## Integrating spatial component at the cluster level
+
+We integrate geospatial data with survey-based child marriage estimates to explore the potential influence of environmental factors. We begin by loading geocovariate data (e.g., aridity) and DHS cluster shapefiles, then merge these with child marriage rates at the cluster level. 
+
+```{r}
+# Load geospatial covariate data
+geo_covariate <- read.csv("Data/BDGC72FL.csv")
+
+# Load DHS cluster shapefile
+DHS_Cam <- read_sf("Data/BDGE71FL/BDGE71FL.shp")
+
+# Merge DHS survey data and geocovariate data
+merged_df <- merge(DHS_Cam, geo_covariate, by = "DHSCLUST")
+
+# Merge child marriage data with the spatial data
+merged_df <- merge(merged_df, cluster_rate, by = "DHSCLUST")
+
+# Remove rows with invalid longitude values
+geo_cam <- subset(merged_df, LONGNUM != 0)
+```
+
+Once again we have a large data set with **`r ncol(geo_cam)`** variables at the cluster level. We will here only use *Aridity*. Later in the analysis, we will select more variables to capture the multi-dimensional aspect of child marriage.
+Here is a quick descrption of the variables at hand. 
+
+```{r echo=FALSE, results=TRUE}
+# Let's explore specific variables. 
+
+Mygeovariables <- c("Drought_Episodes", "Global_Human_Footprint", "Irrigation",
+                    names(select(geo_cam, ends_with("2015")) ))
+
+datasummary_skim(select(geo_cam, Mygeovariables), 
+                 title = "Child marriage rate by cluster",
+                 digit =2, 
+                notes = paste("N =", nrow(cluster_summary)) )
+
+```
+
+
+We need to do  basic data cleaning and ensure that all spatial layers use a common coordinate reference system (CRS) to allow accurate spatial analysis and mapping.
+Also, we can observe some minimal values at **-9999** that are not correct. 
+
+```{r}
+
+geo_cam$Aridity_2015[geo_cam$Aridity_2015 < 0] <- NA
+summary(geo_cam$Aridity_2015)
+```
+```{r}
+# Load Bangladesh administrative boundary shapefile
+boundary <- read_sf("Data/gadm41_BGD_shp/gadm41_BGD_2.shp")
+
+## ----Check CRS and Transform if Needed-------------------------------------------------------------------------------
+# Ensure CRS compatibility
+st_crs(boundary) <- 4326  # Set CRS to WGS 84 if not already
+st_crs(geo_cam) <- 4326   # Ensure geo_cam has the same CRS
+```
+
+
+```{r}
+## ----Calculate Top 10% Child Marriage Clusters-----------------------------------------------------------------------
+# Calculate the 90th percentile of child marriage rates
+threshold_marriage <- quantile(geo_cam$child_marriage_rate, 0.75, na.rm = TRUE)
+top_25_clusters <- subset(geo_cam, child_marriage_rate > threshold_marriage)
+summary(geo_cam$child_marriage_rate)
+```
+
+
+```{r}
+## ----Plot Child Marriage and Aridity on a Single Map-----------------------------------------------------------------
+# Create the enhanced map
+overlay_map <- ggplot() +
+  # Plot administrative boundaries
+  geom_sf(data = boundary, fill = "white", color = "grey", linewidth = 0.2) +
+  
+  # Plot aridity values as background points
+  geom_point(data = geo_cam, 
+             aes(x = LONGNUM, y = LATNUM, color = Aridity_2015), 
+             size = 5) +
+  scale_color_gradient(low = "white", high = "#ec6930", name = "Aridity 2015") +
+  scale_alpha_continuous(range=c(0.3,1)) +
+  
+  # Plot top 10% child marriage clusters with distinct styling
+  geom_point(data = subset(geo_cam, child_marriage_rate > threshold_marriage), 
+             aes(x = LONGNUM, y = LATNUM), 
+             size = 1.5, shape = 21, fill = "black", color = "black", stroke = 1.5) +
+  
+  # Customize the theme for a clean appearance
+  theme_void() +
+  coord_sf()
+
+# Plot the final enhanced map
+plot(overlay_map)
+
+```
+
+
+
+
+
+
+
+# Logistic regression
+
+## Data preparation 
+
+
+```{r}
+# Load geospatial covariate data
+geo_covariate <- read.csv("Data/BDGC72FL.csv")
+
+# Merge DHS with environmental variables
+DHS_Full <- merge(DHS_data , geo_covariate, by.x ="V001", by.y=c("DHSCLUST"), all.x=T) 
+
+```
+
+
+```{r}
+# Aridity has some negative values (-9999)
+ DHS_Full <- DHS_Full %>%
+  mutate(Aridity = ifelse(Aridity_2015 < 0, NA, Aridity_2015)  )
+```
+
+
+```{r}
+# Defining the variables of the model
+Y<-"married_before_18"               # Response variable
+# XCovars <- c(15, 17, 57:64)   # age+education+GIS
+XCovars <- c("Age", "Education", "Electricity" ,  "Aridity", "Drought_Episodes",  "UN_Population_Density_2015",  "SMOD_Population_2015") 
+
+#DHS_Full$Drought_Episodes
+
+```
+
+> We can define the formula as a string variable for reusing..
+
+```{r}
+formula_string<- paste(Y, paste(XCovars, collapse=" + "), sep="~")
+print(paste(" Regression formula: ",formula_string))
+
+```
+
+## Results
+
+```{r, results='asis'}
+# Logistics Regression with the DHS structure
+
+glm.simple.fit <- glm(formula_string, 
+               data = DHS_Full,
+               family = binomial)
+
+
+# Nice printing of the results (using paper and knitr packages)
+pretty_lm2 <- prettify(summary(glm.simple.fit))
+kable(pretty_lm2, digits = 3)
+
+```
+
+
+
+> But, wait,  we need to take into account the specific structure of the DHS survey. 
+
+
+```{r}
+# Convert to correct types
+DHS_FULL_Strat <- DHS_Full %>%
+         mutate(V003 <- as.factor(V003))
+         
+# Create the survey design object
+DHSdesign <- svydesign(id = ~V001,               # Cluster (PSU)
+                    strata = ~V003,           # Stratification
+                    weights = ~wt,
+                    data = DHS_FULL_Strat, 
+                    nest = TRUE)
+```
+
+```{r, results='asis'}
+# Logistics Regression with the DHS structure
+glm.fit.strat <- svyglm(formula_string, 
+               data = DHS_FULL_Strat,
+               design = DHSdesign, 
+               family = binomial)
+
+
+# Nice printing of the results (using paper and knitr packages)
+pretty_lm2 <- prettify(summary(glm.fit.strat))
+kable(pretty_lm2, digits = 3)
+
+```
+
+
+## Confusion Matrix and other criterias
+
+```{r, results=TRUE }
+library("regclass")
+cm <- confusion_matrix(glm.simple.fit)
+cm
+```
+
+
+
+```{r}
+# Computing elements from the confusision matrix
+
+TP <- as.numeric(cm[2, 2])  # True Positives
+TN <- as.numeric(cm[1, 1])  # True Negatives
+FP <- as.numeric(cm[1, 2])  # False Positives
+FN <- as.numeric(cm[2, 1])  # False Negatives
+
+# Calculate accuracy
+accuracy <- (TP + TN) / (TP+TN+FP+FN)
+
+# Calculate specificity
+specificity <- TP / (TP + FP)
+
+# Calculate sensitivity
+sensitivity <- TP / (TP + FN)
+
+# Calculate F1-score
+f1_score <- 2 * (specificity * sensitivity) / (specificity + sensitivity)
+```
+
+#### Some definitions 
+Accuracy: (TP + TN) / (TP + TN + FP + FN)
+Specificity : TP / (TP + FP) — proportion of positive predictions that are correct.
+Sensitivity (recall)): TP / (TP + FN) — proportion of actual positives that are correctly predicted.
+
+
+Here, we have for the logit model : 
+
+- `r paste("accuracy =", round(accuracy, 3))`
+- `r paste("specificity = ", round(specificity,3))`
+- `r paste("sensitivity =", round(sensitivity,3))`
+- `r paste("f1_score =",  round(f1_score,3))`
+
+## Visual representation of the logistic model
+
+
+```{r }
+library(visreg)
+library(ggpubr)
+
+# Probabilities of married before 15 wrt 
+p.age <- visreg(glm.fit.strat, "Age", scale="response", rug=0,  # for rugs =2
+       xlab="Age",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+p.education <- visreg(glm.fit.strat, "Education", scale="response", rug=0,
+       xlab="Education",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) + theme_minimal() + 
+ theme(axis.text.x = element_text(angle = 45,
+                                   vjust = 1,
+                                   hjust=1,
+                                   size=7))
+
+
+p.aridity <- visreg(glm.fit.strat, "Aridity", scale="response", rug=0,
+       xlab="Aridity level (2015)",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+p.income <- visreg(glm.fit.strat, "UN_Population_Density_2015", scale="response", rug=0,
+       xlab=" Population Density (2015)",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+
+figure <- ggarrange( p.age, p.education, p.aridity, p.income,
+                    #labels = c("Edudation", "Age",  "Aridity (2015)", ""),
+                    ncol = 2, nrow = 2)
+figure
+```
+
+```{r}
+knitr::knit_exit()
+```
+
+
+
+
+
+
+```{r }
+library(ggcorrplot)
+
+# We compute the correlation matrix of the covariates
+corr_coef<-cor(data.agg[, c(3:10)],use = "p")
+#And then plot it with nice options 
+ggcorrplot(corr_coef, 
+           type = "lower",         # lower triangle of the matrix only
+           hc.order = TRUE,        # variable sorted from highest to lowest
+           outline.col = "white",  #Color options
+           lab = TRUE)
+
+```
+
+# Logistic regression
+
+## Data preparation 
+
+```{r}
+# We use the dhsdataMerge function to merge the survey data (individuals)
+# with all the Geo-covariate extracted at the cluster level
+DataMerged1<-dhsdataMerge(merged1)
+
+# We need to have a factor variable and not directly Before15 (that is numeric here)  
+DataMerged1$I_Before15 <- as.factor(DataMerged1$Before15)
+
+# Education is a factor variable
+DataMerged1$Education <- as.factor(DataMerged1$Education)
+# DataMerged1 <- DataMerged1 %>%                    # defining the reference category
+#   mutate(Education = relevel(Education, "0-No"))
+# 
+
+# We change the unit of Aridity here 
+DataMerged1$Aridity2015 <- DataMerged1$Aridity2015 * 10^8
+
+# Defining the variables of the model
+Y<-"I_Before15"               # Response variable
+XCovars <- c(15, 17, 57:64)   # age+education+GIS
+```
+
+> We can define the formula as a string variable for reusing..
+
+```{r}
+formula_string<- paste(Y, paste(colnames(DataMerged1)[XCovars], collapse=" + "), sep="~")
+print(paste(" Regression formula: ",formula_string))
+
+```
+
+
+## Results
+
+
+```{r, results='asis'}
+# Logistics Regression with the DHS structure
+
+glm.simple.fit <- glm(formula_string, 
+               data = DataMerged1,
+               family = binomial)
+
+
+# Nice printing of the results (using paper and knitr packages)
+pretty_lm2 <- prettify(summary(glm.simple.fit))
+kable(pretty_lm2, digits = 3)
+
+```
+
+
+
+> But, wait,  we need to take into account the specific structure of the DHS survey. 
+
+
+```{r}
+# Convert to correct types
+DataMerged1$DHSCLUST <- as.numeric(DataMerged1$DHSCLUST)
+DataMerged1$V003 <- as.factor(DataMerged1$V003)
+DataMerged1$HV005 <- as.numeric(DataMerged1$HV005)  # If not already numeric
+DataMerged1$HHweights <- DataMerged1$HV005 / 1000000 # Rescale the weights
+
+# Create the survey design object
+DHSdesign <- svydesign(id = ~DHSCLUST,               # Cluster (PSU)
+                    strata = ~V003,           # Stratification
+                    weights = ~HHweights,
+                    data = DataMerged1, 
+                    nest = TRUE)
+```
+
+```{r, results='asis'}
+# Logistics Regression with the DHS structure
+
+glm.fit <- svyglm(formula_string, 
+               data = DataMerged1,
+               design = DHSdesign, 
+               family = binomial)
+
+
+# Nice printing of the results (using paper and knitr packages)
+pretty_lm2 <- prettify(summary(glm.fit))
+kable(pretty_lm2, digits = 3)
+
+```
+
+
+
+## Confusion Matrix and other criterias
+
+```{r, results=TRUE }
+library("regclass")
+cm <- confusion_matrix(glm.fit)
+cm
+```
+```{r}
+# Computing elements from the confusision matrix
+
+TP <- as.numeric(cm[2, 2])  # True Positives
+TN <- as.numeric(cm[1, 1])  # True Negatives
+FP <- as.numeric(cm[1, 2])  # False Positives
+FN <- as.numeric(cm[2, 1])  # False Negatives
+
+# Calculate accuracy
+accuracy <- (TP + TN) / (TP+TN+FP+FN)
+
+# Calculate specificity
+specificity <- TP / (TP + FP)
+
+# Calculate sensitivity
+sensitivity <- TP / (TP + FN)
+
+# Calculate F1-score
+f1_score <- 2 * (specificity * sensitivity) / (specificity + sensitivity)
+```
+
+#### Some definitions 
+Accuracy: (TP + TN) / (TP + TN + FP + FN)
+Specificity : TP / (TP + FP) — proportion of positive predictions that are correct.
+Sensitivity (recall)): TP / (TP + FN) — proportion of actual positives that are correctly predicted.
+
+
+Here, we have for the logit model : 
+
+- `r paste("accuracy =", round(accuracy, 3))`
+- `r paste("specificity = ", round(specificity,3))`
+- `r paste("sensitivity =", round(sensitivity,3))`
+- `r paste("f1_score =",  round(f1_score,3))`
+
+## Visual representation of the logistic model
+
+
+```{r visreg}
+library(visreg)
+library(ggpubr)
+
+# Probabilities of married before 15 wrt 
+p.age <- visreg(glm.fit, "Age", scale="response", rug=0,  # for rugs =2
+       xlab="Age",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+p.education <- visreg(glm.fit, "Education", scale="response", rug=0,
+       xlab="Education",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) + theme_minimal() + 
+ theme(axis.text.x = element_text(angle = 45,
+                                   vjust = 1,
+                                   hjust=1,
+                                   size=7))
+
+
+p.aridity <- visreg(glm.fit, "Aridity2015", scale="response", rug=0,
+       xlab="Aridity level (2015)",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+p.income <- visreg(glm.fit, "aIncome2013", scale="response", rug=0,
+       xlab=" Estimated income (in $ 2013)",
+       ylab="P(Before15=1)", gg=TRUE) + 
+  ylim(0,1) +theme_minimal()
+
+
+figure <- ggarrange( p.age, p.education, p.aridity, p.income,
+                    #labels = c("Edudation", "Age",  "Aridity (2015)", ""),
+                    ncol = 2, nrow = 2)
+figure
+```
+
+
+# Random Forests  
+ 
+ 
+```{r RF, cache = TRUE}
+set.seed(888)               # set random seed so we can reproduce the result
+myRandomForest<-randomForest(as.formula(formula_string),
+                             data = DataMerged1,
+                             importance = TRUE,
+                             maxnodes=25,
+                             ntree=1000,
+                             type="classification",
+                             na.action = na.roughfix)
+```
+
+## Accuracy rate and confusion Matrix 
+
+```{r, results = TRUE}
+myRandomForest
+
+```
+#### 
+```{r}
+cm <- myRandomForest$confusion
+print(cm)
+```
+```{r}
+# Computing elements from the confusision matrix
+
+TP <- as.numeric(cm[2, 2])  # True Positives
+TN <- as.numeric(cm[1, 1])  # True Negatives
+FP <- as.numeric(cm[1, 2])  # False Positives
+FN <- as.numeric(cm[2, 1])  # False Negatives
+
+# Calculate accuracy
+accuracy <- (TP + TN) / (TP+TN+FP+FN)
+
+# Calculate specificity
+specificity <- TP / (TP + FP)
+
+# Calculate sensitivity
+sensitivity <- TP / (TP + FN)
+
+# Calculate F1-score
+f1_score <- 2 * (specificity * sensitivity) / (specificity + sensitivity)
+```
+
+## Results for RF
+
+```{r}
+# Output the results
+paste("accuracy RF =", round(accuracy, 3))
+paste("specificity RF = ", round(specificity,3))
+paste("sensitivity RF =", round(sensitivity,3)) 
+paste("f1_score RF =",  round(f1_score,3))
+```
+
+Here, we have for the RF model : 
+
+- `r paste("accuracy for RF =", round(accuracy, 3))`
+- `r paste("specificity for RF = ", round(specificity,3))`
+- `r paste("sensitivity for RF =", round(sensitivity,3))`
+- `r paste("f1_score for RF =",  round(f1_score,3))`
+
+## Variable importance plot 
+
+```{r}
+varImpPlot(myRandomForest)
+```
+
+
+

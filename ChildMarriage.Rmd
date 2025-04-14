@@ -1,5 +1,5 @@
 ---
-title: "Analysing the realtions between child marriage and the environment"
+title: "Analysing the Relations Between Child Marriage and the Environment"
 subtitle: "A step-by-step case study with Bangladesh data (DHS) "
 author: "Christophe Bontemps (SIAP)  & Eunkoo Lee (UN Women)"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -8,10 +8,10 @@ output:
     toc: yes
     toc_float: true
     code_folding: hide
+  word_document:
+    toc: yes
   pdf_document:
     toc: yes
-  word_document:
-    toc: no
 ---
 
 ```{r setup, include=FALSE}
@@ -520,7 +520,7 @@ This initial geospatial insight provided the motivation for a multivariate appro
 These findings suggest that effective policy responses should integrate both social and environmental dimensions to address child marriage.
 
 
-```{r}
+```{r include=FALSE}
 knitr::knit_exit()
 ```
 
@@ -540,7 +540,7 @@ print(paste(" Regression formula: ",formula_rf))
 ```
 
 
-```{r RF, cache = TRUE}
+```{r , cache = TRUE}
 myRandomForest<-randomForest(as.formula(formula_rf),
                              data = DHS_Full,
                              importance = TRUE,

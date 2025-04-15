@@ -49,10 +49,6 @@ library(polyglotr)
 <img src="https://www.berlin.de/imgscaler/1YV9UHBqvIYVDAJu1vYaVvOLAaK0-OfvunIbzhabF5s/rbig2zu1/L3N5czExLXByb2QvZm90b2xpYS9nZWdlbnN0YWVuZGUvZm90b2xpYV80ODIyNDM4N19zdWJzY3JpcHRpb25fbW9udGhseV94eGwuanBn.jpg?ts=1727162536" width="300">
 
 
-```{r, out.width = "400px", results= TRUE}
-# knitr::include_graphics("BerlinPolice.png")
-```
-
 # Scraping data from Berlin Police Reports
 
 This sample project aims to showcase through a specific analysis,  how we can use web scraping for gender statistics. As an example, we  analyse police reports in Berlin. 
@@ -62,22 +58,17 @@ Specifically, we will try to answer two questions:
 * Can we identify crimes that are specifically against women? 
 * Does the number of reports differ over time?
   
-We will base our analysis on the website
-<https://www.berlin.de/polizei/polizeimeldungen/archiv/>{target="_blank"} that 
-contains reports by the Berlin police that are open to the public, beginning
-with the year 2014. 
-
-
-
+We will base our analysis on the website <https://www.berlin.de/polizei/polizeimeldungen/archiv/>{target="_blank"} that 
+contains reports by the Berlin police that are open to the public, beginning with the year 2014. 
 
 ## Tools and methods 
 
-We need specific packages for web scraping. In particular we use the package  `rvest`
+We need specific packages for web scraping. In particular we use the package  `rvest` and its function `read_html()` allowing R to fetch the entire HTML content of a webpage. It's the core tool for turning webpages into data. 
 
 We will gather the links to all *subpages*, download them and  extract the text
 of the report, as well as the date, time and district where it occurred.
 
-> We begin by downloading the mainpage to have a list of available pages
+> We begin by scraping the main page to have a list of available *subpages* (per year)
 
 ``` {r parse_mainpage}
 # This downloads the first page as HTML
@@ -91,7 +82,9 @@ From this complex object *website*, that contains the code of the landing page, 
 
 ## Html analysis and extraction of subpages links
 
-We use functions like `html_nodes()` and `html_text()` from the *rvest* package to navigate and extract the desired data from the page. For example, to extract all *links* to individual reports, you  use:
+HTML pages are made of blocks that structure content on a webpage, each serving a specific purpose such as displaying text, images, or links. Understanding these elements helps us organize and manipulate web content for both design and functionality, making websites interactive and user-friendly. We use `html_elements() `to select and return one or more HTML blocks based on their CSS selectors, tags, or attributes.
+
+Other functions like `html_nodes()` and `html_text()` - also from from the *rvest* package -  are used to navigate and extract the desired data from the page. For example, to extract all the  *links* (URLs) to individual reports, we  use the following code, extracting the information from the webpage already scraped. 
 
 
 ``` {r build_links, echo =TRUE,  results= TRUE }
@@ -387,7 +380,7 @@ reports %>%
   labs(title = "Percentages of Women-Related Reports by Year",
        subtitle = Mysubtitle,
        x = "Year", 
-       y = "Percentages of reports involving women ")
+       y = " % of reports involving women ")
 
 ```
 

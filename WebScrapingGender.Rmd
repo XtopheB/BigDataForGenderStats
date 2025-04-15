@@ -1,0 +1,419 @@
+---
+title: "Web Scraping "
+subtitle: "*Regional Training on Big Data and Data Science for Gender Statistics  in Asia and the Pacific*"
+author: 
+- Christophe Bontemps SIAP^[This work was largely inspired from the book by Jakob Tures [Web Scraping using R](https://jakobtures.github.io/web-scraping/index.html) ]
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_float: true
+    code_folding: show
+    highlight: tango
+    number_sections: no
+    theme: lumen
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set( message = FALSE, warning = FALSE, 
+                       results =FALSE, echo = TRUE, cache=FALSE, 
+                       fig.width=7, fig.height=4, 
+                       dev="png", 
+                       dev.args=list(type="cairo"), dpi=96)
+
+```
+
+```{r, include=FALSE}
+# My colors:
+SIAP.color <- "#0385a8"
+```
+
+```{r packages}
+# Document formatting and generation
+library(knitr)
+
+# Data manipulation 
+library(tidyverse)
+
+# Web scraping 
+library(httr)
+library(rvest)
+
+# Text analysis
+library(stringr)
+library(polyglotr)
+```
+
+<img src="https://www.berlin.de/imgscaler/1YV9UHBqvIYVDAJu1vYaVvOLAaK0-OfvunIbzhabF5s/rbig2zu1/L3N5czExLXByb2QvZm90b2xpYS9nZWdlbnN0YWVuZGUvZm90b2xpYV80ODIyNDM4N19zdWJzY3JpcHRpb25fbW9udGhseV94eGwuanBn.jpg?ts=1727162536" width="300">
+
+
+```{r, out.width = "400px", results= TRUE}
+# knitr::include_graphics("BerlinPolice.png")
+```
+
+# Scraping data from Berlin Police Reports
+
+This sample project aims to showcase through a specific analysis,  how we can use web scraping for gender statistics. As an example, we  analyse police reports in Berlin. 
+
+Specifically, we will try to answer two questions:
+
+* Can we identify crimes that are specifically against women? 
+* Does the number of reports differ over time?
+  
+We will base our analysis on the website
+<https://www.berlin.de/polizei/polizeimeldungen/archiv/>{target="_blank"} that 
+contains reports by the Berlin police that are open to the public, beginning
+with the year 2014. 
+
+
+
+
+## Tools and methods 
+
+We need specific packages for web scraping. In particular we use the package  `rvest`
+
+We will gather the links to all *subpages*, download them and  extract the text
+of the report, as well as the date, time and district where it occurred.
+
+> We begin by downloading the mainpage to have a list of available pages
+
+``` {r parse_mainpage}
+# This downloads the first page as HTML
+
+website <- "https://www.berlin.de/polizei/polizeimeldungen/archiv/" %>% 
+  read_html()
+
+```
+
+From this complex object *website*, that contains the code of the landing page,  we can  extract the URLs for the yearly archives. 
+
+## Html analysis and extraction of subpages links
+
+We use functions like `html_nodes()` and `html_text()` from the *rvest* package to navigate and extract the desired data from the page. For example, to extract all *links* to individual reports, you  use:
+
+
+``` {r build_links, echo =TRUE,  results= TRUE }
+links <- website %>% 
+  html_elements(css = "div.textile a[title^='Link']") %>% 
+  html_attr(name = "href") %>% 
+  str_c("https://www.berlin.de", .)
+
+# Display the first 6 links fetched from the landing page 
+links[1:6]
+```
+
+#### A bit of explanation 
+
+ - All the `<a>` tags that contain those links have a `title=` attribute whose value begins with
+"Link". 
+-  they are contained in a `<div>` tag with the class `textile`. 
+
+We  use this to extract the value of the `href=`
+attribute and, as they are incomplete URLs, append them to the base URL.
+
+> Each ***link*** corresponds to a year. We restrict our analysis to the last 6 years [2020-2025]
+
+``` {r clean_links}
+links <- links[1:6]
+```
+
+## Extracting subpages with reports
+
+To extract all subpages from the Berlin Police archive, we first determine the **total number of pages per year** by parsing the initial page's pagination structure. This involves identifying the *last page number* through the HTML element with classes pager-item and last, then iteratively constructing URLs using the `?page_at_1_0=` query parameter to access each subsequent subpage.
+
+As an example, to access to the fifth page for 2022 we will need `.../2022/?page_at_1_0=5` in 
+
+`https://www.berlin.de/polizei/polizeimeldungen/archiv/2022/?page_at_1_0=5`
+
+
+This is a bit technical, but it works and we can now integrate the number of pages for each link, that is for each year. 
+
+``` {r gather_subpages}
+max_pages <- links %>% 
+  map(~ {
+    Sys.sleep(2)
+    read_html(.x)
+  }) %>%
+  map(html_element, css = "li.pager-item.last > a") %>% 
+  map(html_text) %>% 
+  as.numeric()
+```
+
+
+> At this stage, we have not really scraped the website. Only the  landing page! 
+
+## Identifying sub pages and reports
+
+Now we have to construct the URLs for each subpage of the Berlin Police yearly archives. For that we need a nested loop. 
+
+```{r construct_all_links}
+# Initialization of the vector 
+pag_links <- character()
+
+# Double nested loop
+for (i in 1:length(links)) {   # for each link (year) 
+  for (j in 1:max_pages[i]) {  
+    pag_links <- append(pag_links, values = str_c(links[i], "?page_at_1_0=", j))
+  }
+}
+```
+
+The outer loop iterates over each year's archive link, while the inner loop runs from 1 to the total number of subpages for that year (as determined by `max_pages[i]`). 
+
+Within the inner loop, `str_c()` concatenates the base URL with the pagination query parameter to form complete subpage URLs, which are then appended to the pag_links vector using append().
+
+
+# Web scraping the Berlin Police yearly archives
+
+Now that all URLs  to all subpages are gathered, we can finally download
+them. 
+
+```{r}
+Nbpages <- 20
+```
+
+>The full download will take more than  10 minutes due to the number
+of subpages (250+) To avoid spending too much time, we download to only  **`r Nbpages`** randomly chosen pages! 
+
+``` {r web_scrap_subpages}
+# We randomly scrap only a few URLs picked from the list of all available
+set.seed(2512)
+
+# Here we select only some pages
+MyIndices <- sample(seq_along(pag_links), Nbpages)
+Mysubtitle <- paste("Based on a subsample of", Nbpages, "pages only!" )
+
+# To get the full list --> uncomment 2 lines below
+# MyIndices <- seq_along(pag_links)
+# Mysubtitle <- paste("Based on All pages" )
+
+# Initialize an empty list to store the HTML content
+pages <- vector("list", length = length(MyIndices))
+
+# Loop through the selected URLs (all or subsample)
+for (i in seq_along(MyIndices)) {
+  Sys.sleep(2)  # Pause for 2 seconds between requests
+  pages[[i]] <- read_html(pag_links[MyIndices[i]])
+}
+
+```
+
+
+## Extracting data of interest
+
+We aim to extract the report text, date/time, and district from the HTML structure. Each element has a unique class—date, text, and category—which makes it easy to target using CSS selectors in web scraping.
+
+```{r}
+# pages is the  list of our  HTML pages, 
+reports <- map_dfr(pages, function(page) {
+  tibble(
+    Date = page %>%
+      html_element("div.cell.nowrap.date") %>%
+      html_text(trim = TRUE),
+    Title = page %>%
+      html_element("div.cell.text > a") %>%
+      html_text(trim = TRUE),
+    District = page %>%
+      html_element("div.cell.text > span.category") %>%
+      html_text(trim = TRUE)
+  )
+})
+
+```
+
+> We have now gathered  `nrow(reports)` reports from the Berlin Police Reports ;-)
+
+```{r, results= TRUE}
+reports %>%
+  slice(1:5) %>%
+  kable()
+
+```
+
+
+#### Dealing with missing data in lists
+
+Some reports are missing the `<span>` with district info, so we need to handle missing values. By extracting each `<li>` tag—each representing a full report—we can ensure all entries are checked, and *NAs* are added where data like district is absent.
+
+
+``` {r list_of_lists}
+list_items <- NULL
+
+for (i in 1:length(pages)) {
+  list_items <- append(list_items, values = html_elements(pages[[i]], css = "ul.list--tablelist > li"))
+}
+```
+
+The newly created list `list_items` contains a node set for each `<li>` tag from
+all subpages. Again, we have to use double brackets to access the node set.
+With single brackets a new list containing the node set as its first element is
+returned, as illustrated here:
+
+``` {r check_lists}
+list_items[[1]]
+
+list_items[1]
+```
+
+We use a for loop to build the tibble row by row from each report, filling in NA when data is missing. Predefining the tibble structure (column names, types, and length) improves efficiency for this large operation.
+
+
+``` {r extract_data_for_loop}
+# Creating the tibble 
+reports <- tibble(
+  Date = character()[1:length(list_items)],
+  Title = character()[1:length(list_items)],
+  District = character()[1:length(list_items)]
+)
+
+# Looping to populate the tibble reports
+for (i in 1:length(list_items)) {
+  reports[i, "Date"] <- html_element(list_items[[i]], css = "div.cell.nowrap.date") %>% 
+    html_text()
+  reports[i, "Title"] <- html_element(list_items[[i]], css = "div.cell.text > a") %>% 
+    html_text()
+  reports[i, "District"] <- html_element(list_items[[i]], css = "div.cell.text > span.category") %>% 
+    html_text()
+}
+```
+
+Let's look at the tibble we just constructed:
+
+``` {r reports_looksie,  results = TRUE}
+reports %>%
+  slice(1:5)%>%
+  kable()
+```
+
+
+## Cleaning 
+
+``` {r mutate_cmpl}
+reports <- reports %>% 
+  mutate(District = substr(District, 14, str_length(District)),
+         date_cmpl = dmy_hm(Date),
+         year = year(date_cmpl),
+         month = month(date_cmpl, label = TRUE),
+         day = wday(date_cmpl, label = TRUE),
+         time = 
+           substr(Date, 12, str_length(Date)) %>% 
+           hm()
+         )
+
+reports
+```
+
+
+
+This also looks good. We now have extracted the data we need to answer our
+questions.
+
+####  Saving the data
+
+We downloaded a lot of subpages, which took a considerable amount of time; if we repeat this for every instance of further data analysis, we create a lot of unnecessary traffic and waste a lot of our own time. 
+
+``` {r save_reports}
+save(reports, file = paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
+```
+
+
+``` {r load_reports}
+load(paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
+```
+
+
+```{r}
+# Define the keywords in German
+keywords <- c("frau", "frauen", "femizid", "geschlecht", "gender", "geschlechter", "geschlechtergerechtigkeit")
+
+# Create a regex pattern that matches any of the keywords
+pattern <- str_c(keywords, collapse = "|")
+
+# Filter the reports
+reports <- reports %>%
+  mutate(Women =  str_detect(str_to_lower(Title), pattern))
+
+
+```
+
+
+# Analysis 
+
+A few examples of reports involving women. We use the package `polyglotr` to translate the results in English
+
+```{r, results = TRUE}
+
+# Translate the 'Title' column from German to English (only for cases involving women)
+women_reports <- reports %>%
+  filter(Women == TRUE) %>%
+  mutate(Title_EN = google_translate(Title, source_language = "de", target_language = "en"))
+
+women_reports %>%
+  slice(1:5) %>%
+  select(year, month,  Title_EN,  District) %>%
+  kable()
+
+```
+
+
+## Nb of reports by year
+
+
+```{r}
+reports %>%
+  group_by(year) %>%
+  summarize(
+    total_reports = n(),
+    women_reports = sum(Women, na.rm = TRUE),
+    pct_women = round(100 * women_reports / total_reports, 2) %>%
+      kable( )
+  )
+
+```
+
+```{r}
+reports %>%
+  filter(!is.na(Women)) %>%
+  group_by(year) %>%
+  summarize(women_reports = sum(Women), 
+            other = sum(!Women)) %>%
+  mutate(perc = 100* women_reports / other) %>%
+  ggplot(aes(x = year, y = perc)) +
+  geom_line(color = SIAP.color ) +
+  geom_point(color = SIAP.color ) +
+  theme_minimal() +
+  labs(title = "Percentages of Women-Related Reports by Year",
+       subtitle = Mysubtitle,
+       x = "Year", 
+       y = "Percentages of reports involving women ")
+
+```
+
+
+
+```{r, results=TRUE }
+reports %>%
+  mutate(type = ifelse(Women, "Women-related", "Other")) %>%
+  group_by(year, type) %>%
+  tally() %>%
+  ggplot(aes(x = factor(year), y = n, fill = type) ) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = c("Other" = "grey", "Women-related" = SIAP.color)) +
+  labs(title = "Reports by Year and Type",
+       subtitle = Mysubtitle ,
+       x = "Year", y = "Count")+
+  theme_minimal()
+
+
+```
+
+# Conclusion 
+
+This exercise demonstrated the end-to-end workflow of web scraping gender-related from police reports (here public reports from Berlin), transforming the raw HTML into a structured dataset, and visualizing women-realted cases over time. 
+
+We extracted meaningful insights about the representation of women-related incidents. Despite challenges like missing data or irregular HTML structure, the approach allowed us to highlight important temporal trends and lays the groundwork for further analysis.
+
+*We used the power of `rvest` for scraping and  `tidyverse` for data wrangling, and  visualization.*
+

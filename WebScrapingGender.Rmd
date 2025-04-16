@@ -5,6 +5,8 @@ author:
 - Christophe Bontemps SIAP^[This work was largely inspired from the book by Jakob Tures [Web Scraping using R](https://jakobtures.github.io/web-scraping/index.html) ]
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
+  word_document: default
+  pdf_document: default
   html_document:
     toc: yes
     toc_float: true
@@ -12,8 +14,6 @@ output:
     highlight: tango
     number_sections: no
     theme: lumen
-  pdf_document: default
-  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -46,7 +46,7 @@ library(stringr)
 library(polyglotr)
 ```
 
-<img src="https://www.berlin.de/imgscaler/1YV9UHBqvIYVDAJu1vYaVvOLAaK0-OfvunIbzhabF5s/rbig2zu1/L3N5czExLXByb2QvZm90b2xpYS9nZWdlbnN0YWVuZGUvZm90b2xpYV80ODIyNDM4N19zdWJzY3JpcHRpb25fbW9udGhseV94eGwuanBn.jpg?ts=1727162536" width="300">
+
 
 
 # Scraping data from Berlin Police Reports
@@ -60,6 +60,8 @@ Specifically, we will try to answer two questions:
   
 We will base our analysis on the website <https://www.berlin.de/polizei/polizeimeldungen/archiv/>{target="_blank"} that 
 contains reports by the Berlin police that are open to the public, beginning with the year 2014. 
+
+<img src= "https://www.berlin.de/imgscaler/1YV9UHBqvIYVDAJu1vYaVvOLAaK0-OfvunIbzhabF5s/rbig2zu1/L3N5czExLXByb2QvZm90b2xpYS9nZWdlbnN0YWVuZGUvZm90b2xpYV80ODIyNDM4N19zdWJzY3JpcHRpb25fbW9udGhseV94eGwuanBn.jpg?ts=1727162536" width="300">
 
 ## Tools and methods 
 
@@ -163,14 +165,14 @@ Within the inner loop, `str_c()` concatenates the base URL with the pagination q
 Now that all URLs  to all subpages are gathered, we can finally download
 them. 
 
-```{r}
-Nbpages <- 20
+```{r NBpages}
+Nbpages <- 10  # (other options are 10, 20...)
 ```
 
 >The full download will take more than  10 minutes due to the number
 of subpages (250+) To avoid spending too much time, we download to only  **`r Nbpages`** randomly chosen pages! 
 
-``` {r web_scrap_subpages}
+``` {r web_scrap_subpages, cache= TRUE}
 # We randomly scrap only a few URLs picked from the list of all available
 set.seed(2512)
 

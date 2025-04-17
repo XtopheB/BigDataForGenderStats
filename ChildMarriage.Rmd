@@ -12,6 +12,7 @@ output:
     code_folding: hide
   pdf_document:
     toc: yes
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}

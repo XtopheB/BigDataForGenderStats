@@ -51,6 +51,7 @@ docs/
 po/*~
 # RStudio Connect folder
 rsconnect/
-
 #Specific
 BerlinPolice.png
+/Outputs/
+WebScrapingGender_files

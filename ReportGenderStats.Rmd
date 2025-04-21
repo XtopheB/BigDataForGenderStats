@@ -20,7 +20,7 @@ output:
 # if these libraries are not already installed on your computer:
 #  - Use the package installation from the bottom right panel in RStudio (recommended)
 # - Or (experimented users) uncomment the next line (only once)
-install.packages(c("tidyverse", "flextable"))
+#install.packages(c("tidyverse", "flextable"))
 
 # For manipulating data
 library(tidyverse)
@@ -32,6 +32,7 @@ library(flextable)
 
 
 ```{r setup, include=FALSE}
+
 # Set echo=FALSE as default for code cells
 # The code folding for HTLM output is thus deactivated
 knitr::opts_chunk$set(echo = TRUE)

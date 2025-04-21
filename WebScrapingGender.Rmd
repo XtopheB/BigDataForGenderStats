@@ -309,13 +309,13 @@ questions.
 
 We downloaded a lot of subpages, which took a considerable amount of time; if we repeat this for every instance of further data analysis, we create a lot of unnecessary traffic and waste a lot of our own time. 
 
-``` {r save_reports}
-save(reports, file = paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
+``` {r save_reports,eval=FALSE, include=FALSE}
+# save(reports, file = paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
 ```
 
 
-``` {r load_reports}
-load(paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
+``` {r load_reports,  eval=FALSE, include=FALSE}
+# load(paste0("Outputs/reports-",Nbpages,"-subpages.RData"))
 ```
 
 

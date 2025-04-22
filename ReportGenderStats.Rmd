@@ -1,7 +1,7 @@
 ---
 title: 'An (automated) Report on Gender Statistics'
 subtitle: "*Regional Training on Big Data and Data Science for Gender Statistics in Asia and the Pacific*"
-author: "Your Name (Your Institution)"
+author: "Christophe Bontemps (Your Institution)"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -26,7 +26,7 @@ output:
 library(tidyverse)
 
 # For tables display
-library(flextable)
+#library(flextable)
 
 ```
 

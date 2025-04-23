@@ -4,21 +4,23 @@ subtitle: "A step-by-step case study with Bangladesh data (DHS) "
 author: "Christophe Bontemps (SIAP)  & Eunkoo Lee (UN Women)"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
-  word_document:
-    toc: yes
   html_document:
-    toc: yes
+    toc: true
     toc_float: true
     code_folding: hide
-  pdf_document:
-    toc: yes
-always_allow_html: true
+  word_document:
+    toc: true
+    toc_depth: 2
+    df_print: tibble
 ---
 
 ```{r setup, include=FALSE}
 # Default for chunk options 
 knitr::opts_chunk$set( message = FALSE, warning = FALSE, 
                        results =FALSE, echo = TRUE)
+
+# Set working directory for all chunks
+#knitr::opts_knit$set(root.dir = "C:/myr/BIg_Data_Korea/Session 15 Exploring the nexus between child marriage and environment")
 
 ```
 
@@ -117,7 +119,7 @@ DHS_data %>% datasummary_skim()
 
 We first define the population under scrutiny (women aged 20-24), and compute child marriage rate by cluster. The indicator is based on a numerator and denominator
 
--  Numerator  = *Nb of women aged 20-24 who where married or in a union before the age of 15 of before age 18*
+-  Numerator  = *Nb of women aged 20-24 who were married or in a union before the age of 15 of before age 18*
 -  Denominator = *Nb of women aged 20-24 in the population*
 
 The rate is then simply:
@@ -142,7 +144,7 @@ cluster_rate<- cluster_rate %>%
 # Median value
 median_rate <- round(median(cluster_rate$child_marriage_rate), 4) *100
 ```
-When computing the child marriage rate for each of the*`r nrow(cluster_rate)`*  cluster, we can see some disparities. Overall the median value is  value is **`r median_rate``** \%.
+When computing the child marriage rate for each of the*`r nrow(cluster_rate)`*  cluster, we can see some disparities. Overall the median value is **`r median_rate``** \%.
 
 
 ```{r echo=FALSE, results=TRUE}
@@ -155,7 +157,7 @@ colnames(cluster_rate)[1] <- "DHSCLUST"
 datasummary_skim(select(cluster_rate, -c("DHSCLUST")), 
                  title = "Child marriage rate by cluster",
                  digit =2, 
-                notes = paste("N =", nrow(cluster_summary)) )
+                notes = paste("N =", nrow(cluster_rate)) )
 
 ```
 
@@ -239,6 +241,10 @@ top_25_clusters <- subset(geo_cam, child_marriage_rate > threshold_marriage)
 
 ```{r}
 ## ----Plot Child Marriage and Aridity on a Single Map-----------------------------------------------------------------
+
+# Removes missing values
+geo_cam <- geo_cam %>% 
+  filter(!is.na(Aridity_2015))
 # Create the enhanced map
 overlay_map <- ggplot() +
   # Plot administrative boundaries
@@ -257,7 +263,7 @@ overlay_map <- ggplot() +
              size = 1.5, shape = 21, fill = "black", color = "black", stroke = 1.5) +
   
   # Customize the theme for a clean appearance
-  ggtitle(label = "Aridity Map of Bangladesh with high mariage rate clusters ", 
+  ggtitle(label = "Aridity Map of Bangladesh with high marriage rate clusters ", 
           subtitle = paste("Clusters with a child marriage rate above", Mythreshold, "are represented (black dots)")) +
   theme_void() +
   coord_sf()
@@ -273,7 +279,7 @@ plot(overlay_map)
 
 ## Data preparation 
 
-For a detailed analysis at the individual level (DHS is micro data) we have to merge DHS data and envrionment data at the cluster level using the location of each household. 
+For a detailed analysis at the individual level (DHS is micro data) we have to merge DHS data and environment data at the cluster level using the location of each household. 
 
 ```{r}
 # Merge DHS with environmental variables
@@ -300,31 +306,37 @@ ZCovars <- c("Drought_Episodes",  "UN_Population_Density_2015",  "SMOD_Populatio
 ```
 
 
-```{r }
+```{r corr_matrix_fixed, fig.width=9, fig.height=7, message=FALSE, warning=FALSE}
 # Drop geometry column (important if geo_cam is an sf object)
 geo_cam_df <- st_drop_geometry(geo_cam)
 
 # Keep only relevant and complete variables 
 existing_vars <- Mygeovariables[Mygeovariables %in% names(geo_cam_df)]
- 
 
+# Select and clean correlation data
 corr_data <- geo_cam_df %>%
-  select(all_of(existing_vars))%>%
+  select(all_of(existing_vars)) %>%
   select(!starts_with("Mal") & !starts_with("All")) %>%
   select(1:8, starts_with("UN"), starts_with("SMOD")) %>%
   mutate(across(everything(), as.numeric))
 
-# We compute the correlation matrix of the covariates
-corr_coef <- cor(corr_data, use = "p")
+# Compute the correlation matrix
+corr_coef <- cor(corr_data, use = "pairwise.complete.obs")
 
-#And then plot it with nice options 
+# Shorten variable names for plotting (optional but improves layout)
+colnames(corr_coef) <- gsub("_2015", "", colnames(corr_coef))
+rownames(corr_coef) <- gsub("_2015", "", rownames(corr_coef))
+
+# Plot the correlation matrix
 ggcorrplot(corr_coef, 
-           title = "Correlation of some environmental variables available",
-           type = "lower",         # lower triangle of the matrix only
-           hc.order = TRUE,        # variable sorted from highest to lowest
-           outline.col = "white",  #Color options
-           lab = TRUE)
-
+           title = "Correlation of Selected Environmental Variables",
+           type = "lower",         
+           hc.order = TRUE,        
+           outline.col = "white",  
+           lab = TRUE,
+           lab_size = 3) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+        axis.text.y = element_text(size = 9))
 ```
 
 In this analysis, we will use: 
@@ -382,7 +394,7 @@ Since we have a survey, and thus each observation is weighted according to speci
 ```{r}
 # Convert to correct types
 DHS_FULL_Strat <- DHS_Full %>%
-         mutate(V003 <- as.factor(V003))
+         mutate(V003 = as.factor(V003))
          
 # Create the survey design object
 DHSdesign <- svydesign(id = ~V001,               # Cluster (PSU)
@@ -419,10 +431,28 @@ t(cm)
 ```
 
 We can also check different numerical indicators based on the confusion matrix. 
-Recalling that: 
 
-```{r, out.width = "400px", results= TRUE}
-knitr::include_graphics("ConfusionMatrix.png")
+```{r plot_confusion_matrix, fig.cap="Visual Confusion Matrix", echo=TRUE, message=FALSE, warning=FALSE}
+# Convert the confusion matrix from regclass to a dataframe for plotting
+cm_df <- as.data.frame(as.table(cm[1:2, 1:2])) 
+ 
+
+colnames(cm_df) <- c("Actual", "Predicted", "Freq")
+
+
+# Create the plot
+conf_matrix_plot <- ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  labs(title = "Confusion Matrix", x = "Actual", y = "Predicted") +
+  theme_minimal()
+
+# Save the plot
+ggsave("ConfusionMatrix.png", conf_matrix_plot, width = 5, height = 4)
+
+# Print the plot inline
+conf_matrix_plot
 ```
 
 We can check several important indicators:
@@ -437,7 +467,7 @@ $$
 
 
 ```{r}
-# Computing elements from the confusision matrix
+# Computing elements from the confusion matrix
 
 TP <- as.numeric(cm[2, 2])  # True Positives
 TN <- as.numeric(cm[1, 1])  # True Negatives
@@ -516,7 +546,7 @@ In this analysis we tested the hypothese that  environmental factors such as dro
 
 By combining data from survey and geospatial sources, we showcase the importance of multi-dimensional drivers of child marriage and provide tools to examine them through a data-driven approach. We provide a  cluster-level exploration of child marriage, revealing a visible spatial correlation between high child marriage rates and aridity and a map of Bangladesh. 
 
-This initial geospatial insight provided the motivation for a multivariate approach taking into account not only socio-economic factoirs, but also environmental factors. We use a modelling based on a logistic regression and results confirmed that, alongside well-established socio-economic drivers like education, environmental factors such as aridity levels are also associated with the likelihood of child marriage. 
+This initial geospatial insight provided the motivation for a multivariate approach taking into account not only socio-economic factors, but also environmental factors. We use a modelling based on a logistic regression and results confirmed that, alongside well-established socio-economic drivers like education, environmental factors such as aridity levels are also associated with the likelihood of child marriage. 
 
 These findings suggest that effective policy responses should integrate both social and environmental dimensions to address child marriage.
 
@@ -524,7 +554,6 @@ These findings suggest that effective policy responses should integrate both soc
 ```{r include=FALSE}
 knitr::knit_exit()
 ```
-
 
 
 
@@ -603,9 +632,27 @@ Here, we have for the RF model :
 
 ## Variable importance plot 
 
-```{r}
-varImpPlot(myRandomForest)
+```{r rf_varimp_plot, fig.width=8, fig.height=6}
+# Extract importance as data frame
+library(randomForest)
+library(ggplot2)
+
+var_imp <- importance(myRandomForest)
+var_imp_df <- data.frame(Variable = rownames(var_imp), 
+                         MeanDecreaseGini = var_imp[, "MeanDecreaseGini"])
+
+# Optional: Clean variable names for readability
+var_imp_df$Variable <- gsub("_2015", "", var_imp_df$Variable)
+
+# Sort and plot
+ggplot(var_imp_df, aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "#ec6930") +
+  coord_flip() +
+  labs(title = "Variable Importance (Random Forest)",
+       x = "Variable", y = "Mean Decrease in Gini") +
+  theme_minimal(base_size = 10)
 ```
+
 
 
 

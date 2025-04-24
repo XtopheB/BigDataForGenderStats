@@ -5,8 +5,6 @@ author:
 - Christophe Bontemps SIAP^[This work was largely inspired from the book by Jakob Tures [Web Scraping using R](https://jakobtures.github.io/web-scraping/index.html) ]
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
-  word_document: default
-  pdf_document: default
   html_document:
     toc: yes
     toc_float: true
@@ -14,6 +12,8 @@ output:
     highlight: tango
     number_sections: no
     theme: lumen
+  pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}

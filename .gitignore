@@ -4,6 +4,7 @@
 # Session Data files
 .RData
 .RDataTmp
+toto
 # User-specific files
 .Ruserdata
 # Map Data

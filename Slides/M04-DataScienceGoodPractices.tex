@@ -78,7 +78,8 @@
 
 
 % Path for the graphs
-\graphicspath{{Graphics/}
+\graphicspath{
+{Graphics/}
 {../../../../Visualisation/Presentations/Graphics/}
 {../../Visualisation/Presentations/Graphics/}
 {c:/Gitmain/MLCourse/UNML/Module0/M0_files/figure-html/}
@@ -291,11 +292,48 @@
              \textbf{Good Practices }\\ + \\
              \textbf{Good Tools }
     \end{center}
-     \item[$\hookrightarrow$] \vspace{2cm} We'll detail some of these practices and tools
+     \item[$\hookrightarrow$] \vspace{2cm} We'll detail some of these practices later!
    \end{itemize}
 
 \end{frame}
 
+\subsection{R and RStudio}
+
+\begin{frame}
+\frametitle{ \includegraphics[height=3ex]{R_logo.svg.png}  \textit{vs} 
+\includegraphics[height=4ex]{RStudioLogo.png}}
+\begin{tabular}{c|c}
+   \includegraphics[height=3ex]{R_logo.svg.png} is the engine      &  \includegraphics[height=4ex]{RStudioLogo.png} is the cockpit  \\
+   \includegraphics[width=0.4\textwidth]{REngine.png}  &     \includegraphics[width=0.4\textwidth]{RStudioAsCarDashboard.png} \\
+\end{tabular}
+\end{frame}
+
+\begin{frame}
+\frametitle{ R Markdown documents}
+\begin{columns}[t]
+ \begin{column}{0.5\textwidth}
+\begin{itemize}[<+->]
+    \item R Markdown documents (notebooks, scripts) are fully reproducible.
+    \item Divided into \textit{\textbf{chunks}}
+    \begin{itemize}
+        \item Code 
+        \item Text in \textit{markdown} language
+    \end{itemize}
+   \item When knitted, code returns graphics, tables, results embedded in a single document
+   \item Code can be shown or hidden
+   \item Output in Word, pdf, Html! 
+\end{itemize}
+\end{column}
+  \begin{column}{0.5\textwidth}
+    \begin{center}
+      \only<1-4>{ \includegraphics[width=0.8\textwidth]{RMarkdownDoc.png} }
+      \only<5-7>{ \includegraphics[width=0.9\textwidth]{RMarkdownExport.jpg} \\ }
+      \only<8>{ \large  \textcolor{siap}{Demo!} \\
+      \includegraphics[width=0.6\textwidth]{RMarkdownDoc.png}}
+   \end{center}
+  \end{column}
+\end{columns}
+\end{frame}
 
 \subsection{Good practices}
 

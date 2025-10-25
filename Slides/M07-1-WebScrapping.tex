@@ -1,0 +1,363 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\documentclass[xcolor=x11names,compress]{beamer}
+\documentclass[xcolor=x11names, aspectratio=169, compress]{beamer}
+%% General document
+\usepackage{graphicx, subfig}
+%% Beamer Layout
+\useoutertheme[subsection=false,shadow]{miniframes}
+\useinnertheme{default}
+\usefonttheme{serif}
+\usepackage{palatino}
+
+%%%%%%% Mes Packages %%%%%%%%%%%%%%%%
+%\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{dsfont} % Pour indicatrice
+\usepackage{url}
+\usepackage{multirow}
+\usepackage[normalem]{ulem}   % For strike out text
+
+% Natbib for clean bibliography
+\usepackage[comma,authoryear]{natbib}
+
+%remove the icon
+\setbeamertemplate{bibliography item}{}
+
+%remove line breaks
+\setbeamertemplate{bibliography entry title}{}
+\setbeamertemplate{bibliography entry location}{}
+\setbeamertemplate{bibliography entry note}{}
+
+%% ------ MEs couleurs --------
+\definecolor{vert}{rgb}{0.1,0.7,0.2}
+\definecolor{brique}{rgb}{0.7,0.16,0.16}
+\definecolor{gris}{rgb}{0.7, 0.75, 0.71}
+\definecolor{twitterblue}{rgb}{0, 0.42, 0.58}
+\definecolor{airforceblue}{rgb}{0.36, 0.54, 0.66}
+\definecolor{siap}{RGB}{3,133, 200}
+
+
+%%%%%%%%%%%%%%%%% BEAMER PACKAGE %%%%%%%
+
+\setbeamercolor{itemize item}{fg=siap}
+%\setbeamercolor{itemize subitem}{fg=blue}
+%\setbeamercolor{itemize subsubitem}{fg=cyan}
+
+\setbeamerfont{title like}{shape=\scshape}
+\setbeamerfont{frametitle}{shape=\scshape}
+
+\setbeamercolor*{lower separation line head}{bg=DeepSkyBlue4}
+\setbeamercolor*{normal text}{fg=black,bg=white}
+\setbeamercolor*{alerted text}{fg=siap}
+\setbeamercolor*{example text}{fg=black}
+\setbeamercolor*{structure}{fg=black}
+\setbeamercolor*{palette tertiary}{fg=black,bg=black!10}
+\setbeamercolor*{palette quaternary}{fg=black,bg=black!10}
+
+% Set the header color to SIAP's color
+\setbeamercolor*{frametitle}{fg=siap}
+
+%remove navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+\renewcommand{\(}{\begin{columns}}
+\renewcommand{\)}{\end{columns}}
+\newcommand{\<}[1]{\begin{column}{#1}}
+\renewcommand{\>}{\end{column}}
+
+%% Add footer with logo
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=2.5ex,dp=1.125ex,%
+    leftskip=.3cm,rightskip=.3cm plus1fil]{author in head/foot}
+    \includegraphics[height=5ex]{SIAP_logo_Big.png}\hfill
+    \insertshortauthor\hfill\insertshorttitle\hfill  \textcolor{siap}{\textit{\insertframenumber}}
+  \end{beamercolorbox}%
+}
+
+
+% Path for the graphs
+\graphicspath{
+{Graphics/}
+{../../../../Visualisation/Presentations/Graphics/Logos}
+{../../Visualisation/Presentations/Graphics/}
+{c:/Gitmain/MLCourse/UNML/Module0/M0_files/figure-html/}
+{c:/Chris/UN-ESCAP/MyCourses2022/MLOS2022/Slides/Graphics/}
+{c:/Chris/UN-ESCAP/MyCourses2023/BigDataKostat/Slides/Graphics/}
+{../../../../Visualisation/Presentations/Graphics/SIAP/icons/}
+{c:/Chris/UN-ESCAP/SIAP-E-learning/Resources/Pictos/}
+ }
+
+\title{\textcolor{siap}{Big Data and Data Science for Gender Statistics in Asia and the Pacific\\ \vspace{0.5cm} }}
+
+\subtitle{\textcolor{brique}{\Large{Web Scraping}}}
+\author{Christophe Bontemps}
+\institute{ \includegraphics[height=10ex]{SIAP_logo_Big.png}}
+\date{}
+
+\begin{document}
+
+% Slide 1: Title Slide
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame} % Cover slide
+\frametitle{\textcolor{brique}{[-  \textbf{Agenda} -]}}
+\begin{itemize}[<+-|alert@+>]
+   \item Methods
+   \item Process
+   \item Examples
+   \item Q\&A
+\end{itemize}
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% AI %%%%%%
+
+\section{Web Scrapping for Big Data}
+
+\begin{frame}{Why Web Scrapping for Big Data?}
+
+\pause
+\begin{itemize}[<+->]
+    \item[] Web scraping:
+    \item Is technically feasible (available technology)
+    \item Allows gathering data from websites \textbf{automatically}
+    \item Allows for the enrichment of official statistics
+    \item Provides access to real-time data
+    \item[$\hookrightarrow$ ] Can facilitate decision making
+    \item Facilitates the identification of trends and patterns over time
+    \item Helps fill data gaps by capturing data that may not be available through traditional sources
+    \item[$\hookrightarrow$] Can facilitate decision making
+ \end{itemize}
+\end{frame}
+
+\section{How to Scrap?}
+
+\begin{frame}{How to  Web Scrap?}
+\pause
+\begin{enumerate}[<+->]
+    \item[] General process is globally simple
+    \item Identify the information that need to be collected
+    \item Identify web site(s) where this information is available
+    \item Connect to the web site regularly
+    \begin{itemize}[<+->]
+         \item[-] Collect the page/ raw data
+         \item[-] Extract the information
+         \item[-] Add to previous
+        \item[$\circlearrowright$] repeat \textbf{3}
+    \end{itemize}
+    \item Clean and Analyze the data
+    \item Produce relevant statistics / indicator
+\end{enumerate}
+\end{frame}
+
+%%%
+% BLUE Background
+{\setbeamercolor{background canvas}{bg=siap}
+ \setbeamercolor{item}{fg=white}
+    \setbeamercolor{normal text}{fg=white}
+    \usebeamercolor[fg]{normal text}
+
+\begin{frame}{How to  Web Scrap?}
+\begin{center}
+\Huge{Reflection time}
+
+\vspace{1cm}
+  \large{What can go wrong during the process?}\\
+\vspace{1cm}
+\emph{( reflect for  5 minutes on each step)}
+
+\vspace{1cm}
+
+\end{center}
+\end{frame}
+}  % End Blue background
+
+%%%
+
+\begin{frame}{What can go wrong?}
+\pause
+\begin{enumerate}[<+->]
+    \item Identify the information $\hookrightarrow$ May not exist
+    \item Identify web site(s) $\hookrightarrow$ Relevance? Perennial? Updates? Rights?
+    \item Connect to the web site regularly $\hookrightarrow$ How often?
+    \begin{itemize}[<+->]
+        \item[-] Collect the page/ raw data $\hookrightarrow$ What to collect? (page? Data? Bundle?)
+        \item[-] Extract the information $\hookrightarrow$ Different structure
+        \item[-] Add to previous $\hookrightarrow$ Consistency
+        \item[$\circlearrowright$] repeat $\hookrightarrow$ How to know if updates?
+    \end{itemize}
+    \item Clean and analyze the data $\hookrightarrow$ Semi-structured data
+    \item Produce relevant statistics / indicator $\hookrightarrow$ Quality?
+\end{enumerate}
+\end{frame}
+
+
+\begin{frame}{Other issues}
+\pause
+\begin{itemize}[<+->]
+    \item May be illegal
+    \item May be difficult/costly due to regular adjustment  (Web site changes, dynamic web sites, ...)
+    \item May be inefficient
+    \item[$\hookrightarrow$ ] Other methods may  exist (API, contracts,...)
+    \item May not be useful
+    \item[$\hookrightarrow$ ] Is the web site trustable? Is the data trustable?  Is there enough info? (scope, market share)
+    \item May not answer the right question
+    \item[$\hookrightarrow$ ] Flight/hotel prices....
+     \item May not be relevant
+    \item[$\hookrightarrow$ ] Business related data
+    \item May be erroneous
+    \item[$\hookrightarrow$ ]How to detect?
+    \item $\cdots$
+\end{itemize}
+\end{frame}
+
+
+
+\section{Considerations}
+
+
+\begin{frame}{Initial considerations}
+Web Scrapping can be illegal, you may:
+\pause
+\begin{itemize}[<+->]
+    \item Not follow terms of service or usage agreements that explicitly prohibit web scraping.
+    \item[$\hookrightarrow$] See \texttt{robots.txt} filie
+    \item Infringe upon intellectual property rights (copyrights and trademarks)
+    \item Collect personal data, raising privacy and data protection concerns.
+    \item Extract proprietary information for competitive advantage may be deemed anti-competitive.
+    \item Be considered as aggressively attacking a web site  (denial of service attacks,..)
+    \item[$\cdots$]
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Initial considerations}
+Web Scrapping is highly technical
+\pause
+\begin{itemize}[<+->]
+    \item Requires IT skills
+    \item Requires mastering several software  and programming languages (Browser, plugins, Java,...)
+    \item Data collected is semi-structured
+    \item[$\hookrightarrow$]  Working with text!
+    \item Data collected needs deep understanding
+    \item[$\hookrightarrow$]  Duplicates, incoherences, errors
+    \item[$\hookrightarrow$ ] Integration often requires additional data
+\end{itemize}
+\end{frame}
+
+\section{Web site information}
+
+\begin{frame}{Exercise}
+You should be aware of  web site downloading policy
+\pause
+\begin{itemize}[<+->]
+    \item Imagine you wan to web scrape \href{https://www.airbnb.com/}{https://www.airbnb.com/}
+    \item there is a file that tells what you can collect
+    \item[$\hookrightarrow$] \texttt{robots.txt}
+    \item Go to \href{https://www.airbnb.com/robots.txt}{https://www.airbnb.com/robots.txt}
+    \item[$\hookrightarrow$] Terms of service?
+    \item Go to \url{https://www.airbnb.com/terms/old\#noneu} \\
+    \footnotesize{"\emph{use any robots, spider, crawler, scraper or other automated means or processes to access, collect data or other content from or otherwise interact with the Airbnb Platform for any purpose}"}
+     \item[$\hookrightarrow$] Is there an API?
+    \item Go to \href{https://www.airbnb.com/terms/api}{https://www.airbnb.com/terms/api}
+
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Syntax of robots.txt}
+The \texttt{robots.txt} file provides instructions on:
+    \begin{itemize}[<+->]
+        \item \textbf{User-agent} = to whom the directive apply.
+        \item Example:
+        \item[] \texttt{User-agent: Googlebot }
+        \item[] \texttt{User-agent: Baiduspider }
+        \item[] \texttt{User-agent: *}
+
+        \item[Note:] "\texttt{*}" means everybody
+
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Syntax of \texttt{robots.txt}}
+The \texttt{robots.txt} file provides instructions on:
+    \begin{itemize}[<+->]
+        \item \textbf{Permissions} = Which directories are allowed to browse
+        \item Example:
+        \item[] \texttt{Allow: /calendar/ical/}
+        \item[] \texttt{Allow: /public/page.html}
+        \item[] \texttt{Disallow: /account}
+        \item[Note:] The \texttt{robots.txt} file is located at the root of the website
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Other restrictions}
+    \begin{center}
+\href{https://en.wikipedia.org/wiki/Digital_Millennium_Copyright_Act}{The Digital Millennium Copyright Act (DMCA)}  is a US federal law that is designed to protect copyright holders from online theft—that is, from the unlawful reproduction or distribution of their works. The DMCA covers music, movies, text and anything that is copyrighted. \\
+  \includegraphics[width = 0.2\textwidth]{DMCA_logo.png}
+    \end{center}
+
+\pause
+    \begin{itemize}[<+->]
+        \item Legal actions may occur
+        \item Still fuzzy (see \href{https://www.jdsupra.com/legalnews/data-scraping-deemed-legal-in-certain-5923866/}{LinkedIn example})
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{True Story}
+A website was used to web scrap gold prices for Official Statistics (in a country)
+\pause
+    \begin{itemize}[<+->]
+        \item It had a DMCA logo!!
+       \item[$\hookrightarrow$] Big problem!
+       \item[$\hookrightarrow$] Write to webmaster
+       \item[$\hookrightarrow$] Conclude agreement
+       \item[$\hookrightarrow$] Discussion on direct data sharing (API)
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame} % Cover slide
+\frametitle{\textcolor{brique}{[Q\&A]}}
+\begin{center}
+\Large \textcolor{siap}{ Questions}
+\end{center}
+\end{frame}
+
+
+\end{document}
+
+
+\begin{frame} % Cover slide
+\frametitle{ }
+\pause
+ \begin{itemize}[<+->]
+  \item[]
+  \item
+\end{itemize}
+\end{frame}
+
+%%%%%%%%%%%%%%% Last Slide %%%%%%%%%%%%%%%%
+
+\begin{frame}[allowframebreaks]%in case more than 1 slide needed
+\frametitle{References}
+    {\footnotesize
+    %\bibliographystyle{authordate1}
+    \bibliographystyle{apalike}
+    \bibliography{../../../Visualisation/Visu}
+    }
+\end{frame}
+\end{document}
+
+%\bibliographystyle{authordate1}
+%\bibliography{c:/Chris/Visualisation/Visu}
+%\end{frame}
